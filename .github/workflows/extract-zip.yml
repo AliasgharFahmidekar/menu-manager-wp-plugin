@@ -9,6 +9,9 @@ on:
       - "*.zip"
       - ".github/workflows/extract-zip.yml"
 
+permissions:
+  contents: write
+
 jobs:
   extract:
     runs-on: ubuntu-latest
@@ -17,7 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Find and extract plugin ZIP
+      - name: Extract plugin ZIP into repository
         shell: bash
         run: |
           set -euo pipefail
@@ -33,13 +36,34 @@ jobs:
           mkdir -p extracted
           unzip -q "$zip_file" -d extracted
 
-          echo "Extracted: $zip_file"
-          echo "Contents:"
-          find extracted -maxdepth 3 -type f | sort
+          # Copy the extracted files/folders into the repository root.
+          # Keep the original ZIP and workflow intact.
+          cp -a extracted/. .
 
-      - name: Upload extracted plugin
-        uses: actions/upload-artifact@v4
-        with:
-          name: extracted-plugin
-          path: extracted/
-          if-no-files-found: error
+          rm -rf extracted
+
+          echo "Extracted: $zip_file"
+          echo "Repository contents:"
+          find . -maxdepth 4 -type f \
+            ! -path './.git/*' \
+            ! -name '*.zip' \
+            | sort
+
+      - name: Commit extracted files to main
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          git reset -- '*.zip'
+
+          if git diff --cached --quiet; then
+            echo "No extracted file changes to commit."
+            exit 0
+          fi
+
+          git commit -m "build: extract plugin files from zip"
+          git push origin main
