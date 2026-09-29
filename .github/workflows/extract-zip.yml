@@ -20,7 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract plugin ZIP into repository
+      - name: Extract plugin ZIP at repository root
         shell: bash
         run: |
           set -euo pipefail
@@ -32,24 +32,38 @@ jobs:
             exit 1
           fi
 
+          # Start from a clean repository root, preserving only GitHub metadata and ZIP.
+          find . -mindepth 1 -maxdepth 1 \
+            ! -name '.git' \
+            ! -name '.github' \
+            ! -name '*.zip' \
+            -exec rm -rf {} +
+
           rm -rf extracted
           mkdir -p extracted
           unzip -q "$zip_file" -d extracted
 
-          # Copy the extracted files/folders into the repository root.
-          # Keep the original ZIP and workflow intact.
-          cp -a extracted/. .
+          # If the ZIP contains one top-level plugin directory, flatten it.
+          entries=(extracted/*)
+          if [ "${#entries[@]}" -eq 1 ] && [ -d "${entries[0]}" ]; then
+            plugin_root="${entries[0]}"
+          else
+            plugin_root="extracted"
+          fi
+
+          cp -a "${plugin_root}/." .
 
           rm -rf extracted
 
-          echo "Extracted: $zip_file"
-          echo "Repository contents:"
-          find . -maxdepth 4 -type f \
-            ! -path './.git/*' \
+          echo "Extracted plugin from: $zip_file"
+          echo "Top-level repository contents:"
+          find . -mindepth 1 -maxdepth 2 \
+            ! -path './.git*' \
+            ! -path './.github*' \
             ! -name '*.zip' \
-            | sort
+            -print | sort
 
-      - name: Commit extracted files to main
+      - name: Commit plugin files to main
         shell: bash
         run: |
           set -euo pipefail
@@ -61,9 +75,9 @@ jobs:
           git reset -- '*.zip'
 
           if git diff --cached --quiet; then
-            echo "No extracted file changes to commit."
+            echo "No plugin file changes to commit."
             exit 0
           fi
 
-          git commit -m "build: extract plugin files from zip"
+          git commit -m "build: publish plugin files at repository root"
           git push origin main
