@@ -164,7 +164,7 @@ class CMM_REST {
         $new_order=CMM_Core::find_clear_sort_order();
         CMM_Core::acf_update('sort_order',$new_order,$new);
         wp_update_post(['ID'=>$new,'menu_order'=>$new_order]);
-        CMM_Core::ensure_product_terms($new,wp_get_post_terms($id,'product_category',['fields'=>'ids']));
+        CMM_Core::ensure_product_terms($new,wp_get_post_terms($id,CMM_Core::product_taxonomy(),['fields'=>'ids']));
         CMM_Core::ensure_product_tags($new,wp_get_object_terms($id,'menu_tag',['fields'=>'ids']));
         $img=CMM_Core::product_image($id); if($img['id']) CMM_Core::acf_update('product_image',$img['id'],$new);
         return rest_ensure_response(CMM_Core::product_payload($new));
