@@ -1,0 +1,45 @@
+name: Extract Plugin ZIP
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "*.zip"
+      - ".github/workflows/extract-zip.yml"
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find and extract plugin ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          zip_file="$(find . -maxdepth 1 -type f -name '*.zip' -print -quit)"
+
+          if [ -z "$zip_file" ]; then
+            echo "No ZIP file found in repository root."
+            exit 1
+          fi
+
+          rm -rf extracted
+          mkdir -p extracted
+          unzip -q "$zip_file" -d extracted
+
+          echo "Extracted: $zip_file"
+          echo "Contents:"
+          find extracted -maxdepth 3 -type f | sort
+
+      - name: Upload extracted plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: extracted-plugin
+          path: extracted/
+          if-no-files-found: error
