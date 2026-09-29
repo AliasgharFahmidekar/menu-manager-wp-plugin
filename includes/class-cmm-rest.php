@@ -251,10 +251,37 @@ class CMM_REST {
     }
 
     public static function get_settings(): WP_REST_Response { return rest_ensure_response(self::settings_payload()); }
-    private static function settings_payload(): array { $logo=absint(get_option('cmm_logo_id',0));return ['cafe_name'=>(string)get_option('cmm_cafe_name',get_bloginfo('name')),'short_description'=>(string)get_option('cmm_short_description',''),'menu_url'=>CMM_Core::manager_url()===''?home_url('/menu/'):home_url('/menu/'),'menu_visible'=>get_option('cmm_menu_visible','1')==='1','logo'=>['id'=>$logo,'url'=>$logo?(string)wp_get_attachment_image_url($logo,'medium'):'']]; }
+    private static function settings_payload(): array {
+        $selected = CMM_Core::product_taxonomy();
+        return rest_ensure_response([
+            'cafe_name' => (string) get_option('cmm_cafe_name', get_bloginfo('name')),
+            'short_description' => (string) get_option('cmm_short_description', ''),
+            'menu_url' => home_url('/menu/'),
+            'menu_visible' => get_option('cmm_menu_visible', '1') === '1',
+            'logo' => ['id' => absint(get_option('cmm_logo_id', 0)), 'url' => get_option('cmm_logo_id') ? (string) wp_get_attachment_image_url(absint(get_option('cmm_logo_id')), 'medium') : ''],
+            'product_taxonomy' => $selected,
+            'product_taxonomies' => CMM_Core::available_product_taxonomies(),
+        ]);
+    }
     public static function save_settings(WP_REST_Request $request): WP_REST_Response|WP_Error {
-        update_option('cmm_cafe_name',sanitize_text_field($request->get_param('cafe_name')??''));update_option('cmm_short_description',sanitize_textarea_field($request->get_param('short_description')??''));update_option('cmm_menu_visible',$request->get_param('menu_visible')?'1':'0');
-        $image=CMM_Core::upload_image('logo');if(is_wp_error($image))return $image;if($image)update_option('cmm_logo_id',$image);if($request->get_param('remove_logo'))delete_option('cmm_logo_id');
+        update_option('cmm_cafe_name', sanitize_text_field($request->get_param('cafe_name') ?? ''));
+        update_option('cmm_short_description', sanitize_textarea_field($request->get_param('short_description') ?? ''));
+        update_option('cmm_menu_visible', $request->get_param('menu_visible') ? '1' : '0');
+
+        $taxonomy = sanitize_key((string) $request->get_param('product_taxonomy'));
+        if ($taxonomy !== '') {
+            $object = taxonomy_exists($taxonomy) ? get_taxonomy($taxonomy) : false;
+            if (!$object || !in_array('product', (array) $object->object_type, true) || empty($object->hierarchical) || empty($object->show_ui)) {
+                return new WP_Error('invalid_product_taxonomy', 'Taxonomy انتخاب‌شده برای محصولات معتبر نیست.', ['status' => 400]);
+            }
+            update_option('cmm_product_taxonomy', $taxonomy);
+        }
+
+        $image = CMM_Core::upload_image('logo');
+        if (is_wp_error($image)) return $image;
+        if ($image) update_option('cmm_logo_id', $image);
+        if ($request->get_param('remove_logo')) delete_option('cmm_logo_id');
+
         return rest_ensure_response(self::settings_payload());
     }
 }
