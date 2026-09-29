@@ -4,6 +4,7 @@ if (!defined('ABSPATH')) { exit; }
 class CMM_Core {
     public static function boot(): void {
         add_action('init', [__CLASS__, 'register_content_model'], 5);
+        add_action('init', [__CLASS__, 'ensure_product_taxonomy_attachment'], 99);
         add_action('init', [__CLASS__, 'register_routes'], 20);
         add_action('init', [__CLASS__, 'maybe_flush_rewrites'], 99);
         add_action('template_redirect', [__CLASS__, 'render_manager'], 5);
@@ -71,7 +72,7 @@ class CMM_Core {
     /** Resolve the single product taxonomy shared with CafeFlo/ACF. */
     public static function product_taxonomy(): string {
         $preferred = sanitize_key((string) get_option('cafeflo_product_taxonomy', ''));
-        foreach ([$preferred, 'product_category', 'product_cat'] as $taxonomy) {
+        foreach ([$preferred, 'product_category'] as $taxonomy) {
             if ($taxonomy === '' || !taxonomy_exists($taxonomy)) {
                 continue;
             }
@@ -81,6 +82,16 @@ class CMM_Core {
             }
         }
         return 'product_category';
+    }
+
+    public static function ensure_product_taxonomy_attachment(): void {
+        if (!post_type_exists('product')) {
+            return;
+        }
+        $taxonomy = self::product_taxonomy();
+        if (taxonomy_exists($taxonomy)) {
+            register_taxonomy_for_object_type($taxonomy, 'product');
+        }
     }
 
     public static function register_content_model(): void {

@@ -99,3 +99,8 @@ Capability:
 ## نسخه 0.2.2
 
 - **Taxonomy مشترک با CafeFlo/ACF**: پنل از taxonomy انتخاب‌شده در گزینهٔ `cafeflo_product_taxonomy` استفاده می‌کند. `product_category` fallback است و پنل taxonomy موازی ایجاد نمی‌کند وقتی taxonomy اصلی از قبل ثبت شده باشد.
+
+
+## نسخه 0.2.3
+
+- اتصال taxonomy در شروع و پایان مرحلهٔ `init` دوباره resolve می‌شود تا اگر ACF/CafeFlo taxonomy را کمی دیرتر ثبت کند، پنل همچنان به همان taxonomy مشترک متصل بماند.
