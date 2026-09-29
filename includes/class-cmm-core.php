@@ -68,6 +68,21 @@ class CMM_Core {
         if ($admin) { $admin->add_cap('manage_cafe_menu'); }
     }
 
+    /** Resolve the single product taxonomy shared with CafeFlo/ACF. */
+    public static function product_taxonomy(): string {
+        $preferred = sanitize_key((string) get_option('cafeflo_product_taxonomy', ''));
+        foreach ([$preferred, 'product_category', 'product_cat'] as $taxonomy) {
+            if ($taxonomy === '' || !taxonomy_exists($taxonomy)) {
+                continue;
+            }
+            $object = get_taxonomy($taxonomy);
+            if ($object && in_array('product', (array) $object->object_type, true)) {
+                return $taxonomy;
+            }
+        }
+        return 'product_category';
+    }
+
     public static function register_content_model(): void {
         if (!post_type_exists('product')) {
             register_post_type('product', [
@@ -83,8 +98,9 @@ class CMM_Core {
                 'menu_icon' => 'dashicons-carrot',
             ]);
         }
-        if (!taxonomy_exists('product_category')) {
-            register_taxonomy('product_category', ['product'], [
+        $taxonomy = self::product_taxonomy();
+        if (!taxonomy_exists($taxonomy)) {
+            register_taxonomy($taxonomy, ['product'], [
                 'labels' => [
                     'name' => 'Product Categories', 'singular_name' => 'Product Category',
                 ],
@@ -94,9 +110,8 @@ class CMM_Core {
                 'hierarchical' => true,
                 'rewrite' => ['slug' => 'product-category'],
             ]);
-        } else {
-            register_taxonomy_for_object_type('product_category', 'product');
         }
+        register_taxonomy_for_object_type($taxonomy, 'product');
         if (!taxonomy_exists('menu_tag')) {
             register_taxonomy('menu_tag', ['product'], [
                 'labels' => [
@@ -306,7 +321,7 @@ class CMM_Core {
     }
 
     public static function product_payload(int $post_id): array {
-        $terms = wp_get_post_terms($post_id, 'product_category', ['fields' => 'all']);
+        $terms = wp_get_post_terms($post_id, self::product_taxonomy(), ['fields' => 'all']);
         $price = self::acf_get('price', $post_id, '');
         $old = self::acf_get('old_price', $post_id, '');
         $description = self::acf_get('description', $post_id, '');
@@ -356,7 +371,7 @@ class CMM_Core {
             }
             $rank += 10;
         }
-        $terms = get_terms(['taxonomy'=>'product_category','hide_empty'=>false,'fields'=>'ids','orderby'=>'name','order'=>'ASC']);
+        $terms = get_terms(['taxonomy'=>self::product_taxonomy(),'hide_empty'=>false,'fields'=>'ids','orderby'=>'name','order'=>'ASC']);
         if (!is_wp_error($terms)) {
             $rank = 10;
             foreach ($terms as $term_id) {
@@ -377,7 +392,7 @@ class CMM_Core {
 
     public static function ensure_product_terms(int $post_id, array $term_ids): void {
         $term_ids = array_values(array_unique(array_filter(array_map('absint', $term_ids))));
-        wp_set_object_terms($post_id, $term_ids, 'product_category', false);
+        wp_set_object_terms($post_id, $term_ids, self::product_taxonomy(), false);
     }
 
     public static function upload_image(string $field = 'image'): int|WP_Error {

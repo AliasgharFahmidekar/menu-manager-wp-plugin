@@ -65,7 +65,7 @@ class CMM_REST {
         $availability = sanitize_key($request->get_param('availability') ?? 'all');
         $visibility = sanitize_key($request->get_param('visibility') ?? 'all');
         $args = ['post_type'=>'product','post_status'=>['publish','draft','private'],'posts_per_page'=>-1,'orderby'=>['menu_order'=>'ASC','title'=>'ASC'],'order'=>'ASC','s'=> $search,'no_found_rows'=>true];
-        if ($category) $args['tax_query'] = [['taxonomy'=>'product_category','field'=>'term_id','terms'=>$category]];
+        if ($category) $args['tax_query'] = [['taxonomy'=>CMM_Core::product_taxonomy(),'field'=>'term_id','terms'=>$category]];
         $meta = [];
         if ($availability === 'available') $meta[]=['key'=>'available','value'=>'1','compare'=>'='];
         if ($availability === 'unavailable') $meta[]=['key'=>'available','value'=>'0','compare'=>'='];
@@ -177,7 +177,7 @@ class CMM_REST {
     }
 
     public static function categories(WP_REST_Request $request): WP_REST_Response {
-        $terms=get_terms(['taxonomy'=>'product_category','hide_empty'=>false,'orderby'=>'meta_value_num','meta_key'=>'cmm_sort_order','order'=>'ASC']);
+        $terms=get_terms(['taxonomy'=>CMM_Core::product_taxonomy(),'hide_empty'=>false,'orderby'=>'meta_value_num','meta_key'=>'cmm_sort_order','order'=>'ASC']);
         if(is_wp_error($terms))return rest_ensure_response([]);
         usort($terms,static fn($a,$b)=>(intval(get_term_meta($a->term_id,'cmm_sort_order',true))<=>intval(get_term_meta($b->term_id,'cmm_sort_order',true))) ?: strcasecmp($a->name,$b->name));
         return rest_ensure_response(array_map([CMM_Core::class,'category_payload'],$terms));
@@ -185,14 +185,14 @@ class CMM_REST {
 
     public static function create_category(WP_REST_Request $request): WP_REST_Response|WP_Error {
         $name=sanitize_text_field($request->get_param('name')??'');if($name==='')return new WP_Error('invalid_name','نام دسته الزامی است.',['status'=>400]);
-        $r=wp_insert_term($name,'product_category',['description'=>sanitize_textarea_field($request->get_param('description')??'')]);if(is_wp_error($r))return $r;
-        $id=(int)$r['term_id'];self::save_category_fields($id,$request);return rest_ensure_response(CMM_Core::category_payload(get_term($id,'product_category')));
+        $r=wp_insert_term($name,CMM_Core::product_taxonomy(),['description'=>sanitize_textarea_field($request->get_param('description')??'')]);if(is_wp_error($r))return $r;
+        $id=(int)$r['term_id'];self::save_category_fields($id,$request);return rest_ensure_response(CMM_Core::category_payload(get_term($id,CMM_Core::product_taxonomy())));
     }
     public static function update_category(WP_REST_Request $request): WP_REST_Response|WP_Error {
-        $id=absint($request['id']);if(!term_exists($id,'product_category'))return new WP_Error('not_found','دسته پیدا نشد.',['status'=>404]);
+        $id=absint($request['id']);if(!term_exists($id,CMM_Core::product_taxonomy()))return new WP_Error('not_found','دسته پیدا نشد.',['status'=>404]);
         $name=sanitize_text_field($request->get_param('name')??'');if($name==='')return new WP_Error('invalid_name','نام دسته الزامی است.',['status'=>400]);
-        $r=wp_update_term($id,'product_category',['name'=>$name,'description'=>sanitize_textarea_field($request->get_param('description')??'')]);if(is_wp_error($r))return $r;
-        self::save_category_fields($id,$request);return rest_ensure_response(CMM_Core::category_payload(get_term($id,'product_category')));
+        $r=wp_update_term($id,CMM_Core::product_taxonomy(),['name'=>$name,'description'=>sanitize_textarea_field($request->get_param('description')??'')]);if(is_wp_error($r))return $r;
+        self::save_category_fields($id,$request);return rest_ensure_response(CMM_Core::category_payload(get_term($id,CMM_Core::product_taxonomy())));
     }
     private static function save_category_fields(int $id,WP_REST_Request $r):void{
         update_term_meta($id,'cmm_visible',$r->get_param('visible')===null?'1':($r->get_param('visible')?'1':'0'));
@@ -201,18 +201,18 @@ class CMM_REST {
         if($r->get_param('remove_image'))delete_term_meta($id,'cmm_image_id');
     }
     public static function delete_category(WP_REST_Request $request): WP_REST_Response|WP_Error {
-        $id=absint($request['id']);if(!term_exists($id,'product_category'))return new WP_Error('not_found','دسته پیدا نشد.',['status'=>404]);
-        $term_count=(int)(get_term($id,'product_category')->count??0);
+        $id=absint($request['id']);if(!term_exists($id,CMM_Core::product_taxonomy()))return new WP_Error('not_found','دسته پیدا نشد.',['status'=>404]);
+        $term_count=(int)(get_term($id,CMM_Core::product_taxonomy())->count??0);
         if($term_count>0)return new WP_Error('category_not_empty','این دسته هنوز محصول دارد. ابتدا محصولات آن را جابه‌جا کنید.',['status'=>409]);
-        $r=wp_delete_term($id,'product_category');if(is_wp_error($r)||!$r)return new WP_Error('delete_failed','حذف دسته انجام نشد.',['status'=>500]);
+        $r=wp_delete_term($id,CMM_Core::product_taxonomy());if(is_wp_error($r)||!$r)return new WP_Error('delete_failed','حذف دسته انجام نشد.',['status'=>500]);
         return rest_ensure_response(['success'=>true,'id'=>$id]);
     }
     public static function duplicate_category(WP_REST_Request $request): WP_REST_Response|WP_Error {
-        $id=absint($request['id']);$t=get_term($id,'product_category');if(!$t||is_wp_error($t))return new WP_Error('not_found','دسته پیدا نشد.',['status'=>404]);
-        $name=$t->name.' — Copy';$r=wp_insert_term($name,'product_category',['description'=>$t->description]);if(is_wp_error($r))return $r;$new=(int)$r['term_id'];update_term_meta($new,'cmm_visible',get_term_meta($id,'cmm_visible',true)?:'1');update_term_meta($new,'cmm_sort_order',0);$img=absint(get_term_meta($id,'cmm_image_id',true));if($img)update_term_meta($new,'cmm_image_id',$img);return rest_ensure_response(CMM_Core::category_payload(get_term($new,'product_category')));
+        $id=absint($request['id']);$t=get_term($id,CMM_Core::product_taxonomy());if(!$t||is_wp_error($t))return new WP_Error('not_found','دسته پیدا نشد.',['status'=>404]);
+        $name=$t->name.' — Copy';$r=wp_insert_term($name,CMM_Core::product_taxonomy(),['description'=>$t->description]);if(is_wp_error($r))return $r;$new=(int)$r['term_id'];update_term_meta($new,'cmm_visible',get_term_meta($id,'cmm_visible',true)?:'1');update_term_meta($new,'cmm_sort_order',0);$img=absint(get_term_meta($id,'cmm_image_id',true));if($img)update_term_meta($new,'cmm_image_id',$img);return rest_ensure_response(CMM_Core::category_payload(get_term($new,CMM_Core::product_taxonomy())));
     }
     public static function reorder_categories(WP_REST_Request $request): WP_REST_Response|WP_Error {
-        $ids=$request->get_param('ids');if(!is_array($ids))return new WP_Error('invalid_order','ترتیب نامعتبر است.',['status'=>400]);$rank=10;$updated=[];foreach($ids as $id){$id=absint($id);if(term_exists($id,'product_category')){update_term_meta($id,'cmm_sort_order',$rank);$updated[]=$id;$rank+=10;}}return rest_ensure_response(['success'=>true,'updated'=>$updated]);
+        $ids=$request->get_param('ids');if(!is_array($ids))return new WP_Error('invalid_order','ترتیب نامعتبر است.',['status'=>400]);$rank=10;$updated=[];foreach($ids as $id){$id=absint($id);if(term_exists($id,CMM_Core::product_taxonomy())){update_term_meta($id,'cmm_sort_order',$rank);$updated[]=$id;$rank+=10;}}return rest_ensure_response(['success'=>true,'updated'=>$updated]);
     }
 
     public static function tags(WP_REST_Request $request): WP_REST_Response {

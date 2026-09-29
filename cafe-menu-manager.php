@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Cafe Menu Manager
  * Description: Custom front-end management dashboard for a single cafe digital menu. Works with Elementor and ACF, with drag & drop ordering.
- * Version: 0.2.1
+ * Version: 0.2.2
  * Author: OpenAI
  * Requires at least: 6.0
  * Requires PHP: 8.0
@@ -10,7 +10,7 @@
 
 if (!defined('ABSPATH')) { exit; }
 
-define('CMM_VERSION', '0.2.1');
+define('CMM_VERSION', '0.2.2');
 define('CMM_FILE', __FILE__);
 define('CMM_DIR', plugin_dir_path(__FILE__));
 define('CMM_URL', plugin_dir_url(__FILE__));
