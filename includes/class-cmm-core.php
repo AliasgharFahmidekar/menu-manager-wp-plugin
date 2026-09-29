@@ -69,10 +69,31 @@ class CMM_Core {
         if ($admin) { $admin->add_cap('manage_cafe_menu'); }
     }
 
-    /** Resolve the single product taxonomy shared with CafeFlo/ACF. */
+    /** Return product taxonomies that can be used as menu categories. */
+    public static function available_product_taxonomies(): array {
+        $taxonomies = get_object_taxonomies('product', 'objects');
+        $result = [];
+        foreach ($taxonomies as $taxonomy) {
+            if (!$taxonomy instanceof WP_Taxonomy || empty($taxonomy->hierarchical) || empty($taxonomy->show_ui)) {
+                continue;
+            }
+            $result[] = [
+                'name' => $taxonomy->name,
+                'label' => $taxonomy->labels->name ?: $taxonomy->label,
+                'singular' => $taxonomy->labels->singular_name ?: $taxonomy->label,
+            ];
+        }
+        usort($result, static fn($a, $b) => strcasecmp($a['label'], $b['label']));
+        return $result;
+    }
+
+    /** Resolve the single product taxonomy selected in Menu Manager. */
     public static function product_taxonomy(): string {
-        $preferred = sanitize_key((string) get_option('cafeflo_product_taxonomy', ''));
-        foreach ([$preferred, 'product_category'] as $taxonomy) {
+        $preferred = sanitize_key((string) get_option('cmm_product_taxonomy', ''));
+        if ($preferred === '') {
+            $preferred = sanitize_key((string) get_option('cafeflo_product_taxonomy', ''));
+        }
+        foreach ([$preferred, 'product_category', 'product_cat'] as $taxonomy) {
             if ($taxonomy === '' || !taxonomy_exists($taxonomy)) {
                 continue;
             }
