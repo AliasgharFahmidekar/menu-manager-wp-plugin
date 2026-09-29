@@ -210,7 +210,7 @@ class CMM_Core {
                 wp_safe_redirect(self::manager_url());
                 exit;
             }
-            self::render_template('login.php', ['error' => self::consume_login_error()]);
+            self::render_template('login.php', ['error' => CMM_Auth::consume_login_error()]);
             exit;
         }
 
