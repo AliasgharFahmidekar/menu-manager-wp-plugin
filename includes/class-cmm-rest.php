@@ -253,7 +253,7 @@ class CMM_REST {
     public static function get_settings(): WP_REST_Response { return rest_ensure_response(self::settings_payload()); }
     private static function settings_payload(): array {
         $selected = CMM_Core::product_taxonomy();
-        return rest_ensure_response([
+        return [
             'cafe_name' => (string) get_option('cmm_cafe_name', get_bloginfo('name')),
             'short_description' => (string) get_option('cmm_short_description', ''),
             'menu_url' => home_url('/menu/'),
@@ -261,7 +261,7 @@ class CMM_REST {
             'logo' => ['id' => absint(get_option('cmm_logo_id', 0)), 'url' => get_option('cmm_logo_id') ? (string) wp_get_attachment_image_url(absint(get_option('cmm_logo_id')), 'medium') : ''],
             'product_taxonomy' => $selected,
             'product_taxonomies' => CMM_Core::available_product_taxonomies(),
-        ]);
+        ];
     }
     public static function save_settings(WP_REST_Request $request): WP_REST_Response|WP_Error {
         update_option('cmm_cafe_name', sanitize_text_field($request->get_param('cafe_name') ?? ''));
